@@ -1,4 +1,9 @@
-# sling
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/sling-dark.svg">
+    <img alt="sling" src="assets/sling-light.svg" width="360">
+  </picture>
+</h1>
 
 Sling a selection from Neovim to a CLI agent (Claude Code by default) running in a tmux pane.
 
