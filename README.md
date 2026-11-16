@@ -37,7 +37,7 @@ Works without configuration: keymaps and the `:Sling` command are registered on 
 
 For a local checkout use `dir = "~/projects/sling"` instead of the repo name.
 
-**vim.pack** (Neovim 0.12+)
+**vim.pack** (Neovim 0.12+, built-in plugin manager)
 
 ```lua
 vim.pack.add({ "https://github.com/Christian-Hoeller/sling" })
@@ -60,20 +60,20 @@ require("sling").setup({})
 
 Update with `git -C ~/.local/share/nvim/site/pack/plugins/start/sling pull`.
 
-### 2. Check
+### 2. Start Neovim inside tmux
+
+```sh
+tmux new -s work
+nvim .
+```
+
+### 3. Check
 
 ```vim
 :checkhealth sling
 ```
 
 Reports the Neovim version, tmux, whether Neovim runs inside tmux, the target commands (`claude`) and the configured actions.
-
-### 3. Start Neovim inside tmux
-
-```sh
-tmux new -s work
-nvim .
-```
 
 ### 4. Sling
 
@@ -104,7 +104,9 @@ Not in tmux? Use the built-in clipboard target:
 | `not inside tmux`             | start nvim from a tmux session (`$TMUX` must be set)                      |
 | `could not open tmux pane`    | check `split` args; `tmux split-window -h claude` must work by hand       |
 | `timed out waiting for <cmd>` | `ready` pattern not seen in the pane within `ready_timeout` (default 15s) |
+| `timed out waiting for claude` in a new folder | Claude Code asks "Do you trust this folder?" first; answer it in the pane, then sling again |
 | keymaps missing / different   | another plugin uses `<leader>a*` (e.g. LazyVim's AI group); remap the actions, see [Configuration](#configuration) |
+| keymaps on `\` instead of space | `mapleader` is set after sling loaded; set it before plugins load |
 
 Run `:checkhealth sling` first.
 
