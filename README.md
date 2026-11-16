@@ -1,12 +1,12 @@
 # sling
 
-Hand off a selection from Neovim to a CLI agent (Claude Code by default) running in a tmux pane.
+Sling a selection from Neovim to a CLI agent (Claude Code by default) running in a tmux pane.
 
 Select code, hit a key, type a prompt. The prompt plus a file/line reference is pasted into the agent's input. If no agent pane exists in the current tmux window, one is opened in a split.
 
 ## Requirements
 
-- Neovim **0.10+** (uses `vim.system`, `vim.fn.getregion`)
+- Neovim **0.10+**
 - [tmux](https://github.com/tmux/tmux) — Neovim must run **inside** a tmux session
 - [Claude Code](https://docs.claude.com/en/docs/claude-code) (`claude` on `$PATH`), or any other CLI agent configured as a target
 - optional: a `vim.ui.input` provider (e.g. [snacks.nvim](https://github.com/folke/snacks.nvim), [dressing.nvim](https://github.com/stevearc/dressing.nvim)) for a nicer prompt box
@@ -23,7 +23,7 @@ which claude
 
 ### 1. Install
 
-The plugin does nothing until `setup()` is called — it registers the keymaps and the `:Sling` command.
+Works without configuration: keymaps and the `:Sling` command are registered on startup. `setup()` is only needed to change the defaults.
 
 **[lazy.nvim](https://github.com/folke/lazy.nvim)**
 
@@ -31,7 +31,7 @@ The plugin does nothing until `setup()` is called — it registers the keymaps a
 {
   "Christian-Hoeller/sling",
   event = "VeryLazy",
-  opts = {}, -- calls require("sling").setup({})
+  opts = {}, -- optional, your config goes here
 }
 ```
 
@@ -41,7 +41,8 @@ For a local checkout use `dir = "~/projects/sling"` instead of the repo name.
 
 ```lua
 vim.pack.add({ "https://github.com/Christian-Hoeller/sling" })
-require("sling").setup()
+-- optional
+require("sling").setup({})
 ```
 
 **Manual (native packages)**
@@ -49,23 +50,32 @@ require("sling").setup()
 ```sh
 git clone https://github.com/Christian-Hoeller/sling \
   ~/.local/share/nvim/site/pack/plugins/start/sling
+nvim -c 'helptags ALL' -c q   # generate :help tags
 ```
 
 ```lua
--- init.lua
-require("sling").setup()
+-- init.lua, optional
+require("sling").setup({})
 ```
 
 Update with `git -C ~/.local/share/nvim/site/pack/plugins/start/sling pull`.
 
-### 2. Start Neovim inside tmux
+### 2. Check
+
+```vim
+:checkhealth sling
+```
+
+Reports the Neovim version, tmux, whether Neovim runs inside tmux, the target commands (`claude`) and the configured actions.
+
+### 3. Start Neovim inside tmux
 
 ```sh
 tmux new -s work
 nvim .
 ```
 
-### 3. Hand off
+### 4. Sling
 
 1. Put the cursor on a line, or select lines in visual mode.
 2. Press `<leader>ap`, type a prompt, e.g. `why is this slow?`, hit `<Enter>`.
@@ -81,13 +91,6 @@ nvim .
 
 `claude` already running in another pane of the same tmux window? It's detected and used instead of opening a new split.
 
-### 4. Verify
-
-```vim
-:Sling add       " pastes only the reference of the current line
-:'<,'>Sling fix  " sends the diagnostics of the selection
-```
-
 Not in tmux? Use the built-in clipboard target:
 
 ```vim
@@ -96,33 +99,49 @@ Not in tmux? Use the built-in clipboard target:
 
 ### Troubleshooting
 
-| Message                          | Cause / fix                                                              |
-| -------------------------------- | ------------------------------------------------------------------------ |
-| `not inside tmux`                | start nvim from a tmux session (`$TMUX` must be set)                     |
-| `could not open tmux pane`       | check `split` args; `tmux split-window -h claude` must work by hand      |
-| `timed out waiting for <cmd>`    | `ready` pattern not seen in the pane within `ready_timeout` (default 15s) |
-| keymaps missing                  | `setup()` not called, or `<leader>a*` taken by another plugin            |
+| Message                       | Cause / fix                                                               |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| `not inside tmux`             | start nvim from a tmux session (`$TMUX` must be set)                      |
+| `could not open tmux pane`    | check `split` args; `tmux split-window -h claude` must work by hand       |
+| `timed out waiting for <cmd>` | `ready` pattern not seen in the pane within `ready_timeout` (default 15s) |
+| keymaps missing / different   | another plugin uses `<leader>a*` (e.g. LazyVim's AI group); remap the actions, see [Configuration](#configuration) |
 
-## Default actions
+Run `:checkhealth sling` first.
 
-| Key          | Action       | What it does                                   |
-| ------------ | ------------ | ---------------------------------------------- |
-| `<leader>ap` | `ask`        | ask for a prompt, prefill it (no submit)       |
-| `<leader>aP` | `ask_submit` | ask for a prompt, submit it                    |
-| `<leader>aa` | `add`        | paste only the `@file#L1-5` reference          |
-| `<leader>ad` | `fix`        | send the diagnostics of the range with "fix"   |
+## Usage
 
-All work in normal mode (cursor line) and visual mode (selection). `:Sling {action}` runs an action too and accepts a range.
+### Default actions
+
+| Key          | Action       | What it does                                 |
+| ------------ | ------------ | -------------------------------------------- |
+| `<leader>ap` | `ask`        | ask for a prompt, prefill it (no submit)     |
+| `<leader>aP` | `ask_submit` | ask for a prompt, submit it                  |
+| `<leader>aa` | `add`        | paste only the `@file#L1-5` reference        |
+| `<leader>ad` | `fix`        | send the diagnostics of the range with "fix" |
+
+All work in normal mode (cursor line) and visual mode (selection).
+
+### Command
+
+```vim
+:Sling              " runs `ask` on the cursor line
+:Sling add          " any action, tab-completes
+:'<,'>Sling fix     " with a range
+```
+
+### Help
+
+`:help sling` has the full reference.
 
 ## Configuration
 
-Three pieces: **templates** build the prompt, **targets** receive it, **actions** combine both with a keymap.
+Three pieces: **templates** build the prompt, **targets** receive it, **actions** combine both with a keymap. Everything is merged into the defaults, so only set what you change.
 
 ```lua
 opts = {
   template = "{input}\n\n@{file}#L{lines}", -- default for all actions
-  target = "claude",
-  submit = false,
+  target = "claude",                        -- default target
+  submit = false,                           -- default: prefill only
 
   targets = {
     claude = {
@@ -134,7 +153,8 @@ opts = {
         return pane.command == "claude" or pane.title:find("Claude Code", 1, true) ~= nil
       end,
       ready = "Claude Code v",   -- lua pattern in the pane content: fresh pane is ready
-      focus = true,
+      ready_timeout = 15000,     -- ms
+      focus = true,              -- jump to the pane after sending
     },
     clipboard = { type = "clipboard" },
     -- a target can also be a function
@@ -150,7 +170,7 @@ opts = {
       keys = "<leader>kt",
       desc = "Write tests",
     },
-    explain = { template = "Explain:\n```{filetype}\n{selection}\n```", input = false, keys = "<leader>ke" },
+    explain = { template = "Explain:\n```{filetype}\n{selection}\n```", keys = "<leader>ke" },
   },
 
   -- extra template variables
@@ -160,9 +180,35 @@ opts = {
 }
 ```
 
+### Action fields
+
+| Field      | Type                 | Default              | Description                                                               |
+| ---------- | -------------------- | -------------------- | ------------------------------------------------------------------------- |
+| `template` | `string`             | top-level `template` | prompt template                                                           |
+| `target`   | `string`             | top-level `target`   | name of a target in `targets`                                             |
+| `input`    | `boolean \| string`  | `nil`                | ask for `{input}` first; a string is the input title; empty input cancels |
+| `submit`   | `boolean`            | top-level `submit`   | press Enter after pasting                                                 |
+| `keys`     | `string \| string[]` | `nil`                | keymap(s)                                                                 |
+| `mode`     | `string \| string[]` | `{ "n", "x" }`       | modes for `keys`                                                          |
+| `desc`     | `string`             | `Sling: <name>`      | keymap description                                                        |
+
 ### Template variables
 
-`{input}` `{file}` (relative to cwd) `{abs_file}` `{dir}` `{cwd}` `{filetype}` `{lines}` (`10` or `10-20`) `{start_line}` `{end_line}` `{selection}` `{diagnostics}`
+| Variable        | Value                                  |
+| --------------- | -------------------------------------- |
+| `{input}`       | text typed at the prompt               |
+| `{file}`        | file path relative to cwd              |
+| `{abs_file}`    | absolute file path                     |
+| `{dir}`         | directory of the file, relative to cwd |
+| `{cwd}`         | current working directory              |
+| `{filetype}`    | buffer filetype                        |
+| `{lines}`       | `10` or `10-20`                        |
+| `{start_line}`  | first line of the range                |
+| `{end_line}`    | last line of the range                 |
+| `{selection}`   | selected text                          |
+| `{diagnostics}` | diagnostics in the range, one per line |
+
+Unknown placeholders are left as is.
 
 ### Lua API
 

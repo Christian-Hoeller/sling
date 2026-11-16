@@ -1,0 +1,205 @@
+*sling.txt*  Sling a selection from Neovim to a CLI agent in a tmux pane
+
+==============================================================================
+CONTENTS                                                      *sling-contents*
+
+  1. Introduction ............................................ |sling-intro|
+  2. Requirements ..................................... |sling-requirements|
+  3. Usage ................................................... |sling-usage|
+  4. Commands ............................................. |sling-commands|
+  5. Default actions ....................................... |sling-actions|
+  6. Configuration .......................................... |sling-config|
+     Actions ......................................... |sling-config-actions|
+     Targets ......................................... |sling-config-targets|
+     Template variables .................................. |sling-variables|
+  7. Lua API ................................................... |sling-api|
+  8. Health ................................................. |sling-health|
+
+==============================================================================
+1. INTRODUCTION                                                  *sling-intro*
+
+sling sends the current line or visual selection to a CLI agent (Claude Code
+by default) running in a tmux pane. A prompt and a `@file#L10-20` reference
+are pasted into the agent's input. If no agent pane exists in the current
+tmux window, one is opened in a split.
+
+The plugin works without configuration: keymaps and |:Sling| are registered
+on startup. Call |sling.setup()| only to change the defaults.
+
+==============================================================================
+2. REQUIREMENTS                                           *sling-requirements*
+
+- Neovim 0.10+
+- tmux, with Neovim running inside a tmux session (for tmux targets)
+- `claude` (Claude Code) on $PATH, or another CLI configured as a target
+
+==============================================================================
+3. USAGE                                                         *sling-usage*
+
+1. Put the cursor on a line, or select lines in visual mode.
+2. Press `<leader>ap` and type a prompt.
+3. The prompt is pasted into the agent pane, but not submitted. Press <CR>
+   there to send it, or use `<leader>aP` to submit right away.
+
+A pane already running the agent in the same tmux window is reused.
+
+==============================================================================
+4. COMMANDS                                                   *sling-commands*
+
+                                                                      *:Sling*
+:[range]Sling [action]
+    Run [action] (default: `ask`) on [range], or on the cursor line when no
+    range is given. Completes action names.
+
+==============================================================================
+5. DEFAULT ACTIONS                                             *sling-actions*
+
+All default keymaps work in normal mode (cursor line) and visual mode
+(selection).
+
+  Key           Action        Description ~
+  `<leader>ap`    `ask`           prompt for input, prefill it (no submit)
+  `<leader>aP`    `ask_submit`    prompt for input, submit it
+  `<leader>aa`    `add`           paste only the `@file#L1-5` reference
+  `<leader>ad`    `fix`           send the diagnostics of the range
+
+==============================================================================
+6. CONFIGURATION                                                *sling-config*
+                                                               *sling.setup()*
+sling.setup({opts})
+    Merge {opts} into the defaults and (re)register keymaps and |:Sling|.
+    Optional. Can be called again; keymaps of the previous call are removed.
+
+Defaults: >lua
+    require("sling").setup({
+      -- used by actions that don't set their own
+      template = "{input}\n\n@{file}#L{lines}",
+      target = "claude",
+      submit = false,
+      targets = {
+        claude = {
+          type = "tmux",
+          cmd = "claude",
+          split = { "-h" },
+          reuse = true,
+          match = function(pane)
+            return pane.command == "claude"
+              or pane.title:find("Claude Code", 1, true) ~= nil
+          end,
+          ready = "Claude Code v",
+          ready_timeout = 15000,
+          focus = true,
+        },
+        clipboard = { type = "clipboard" },
+      },
+      actions = { --[[ see |sling-actions| ]] },
+      vars = {},
+    })
+<
+                                                              *sling-template*
+template ~
+    Default prompt template. `{name}` placeholders are replaced, see
+    |sling-variables|. Unknown placeholders are left as is.
+
+target ~
+    Name of the default target in `targets`.
+
+submit ~
+    Default for actions: press <CR> after pasting.
+
+vars ~
+    Extra template variables, `name -> fun(ctx): string`: >lua
+    vars = {
+      branch = function()
+        return vim.trim(vim.fn.system("git branch --show-current"))
+      end,
+    }
+<
+------------------------------------------------------------------------------
+ACTIONS                                                 *sling-config-actions*
+
+`actions` maps a name to an action table, or `false` to disable a default.
+Tables are merged into the defaults, so changing one field is enough: >lua
+    actions = {
+      ask = { keys = "<leader>kp" },
+      fix = false,
+      tests = {
+        template = "Write tests for @{file}#L{lines}",
+        submit = true,
+        keys = "<leader>kt",
+        desc = "Write tests",
+      },
+    }
+<
+Action fields:
+
+  template  (string)           prompt template, default: `template`
+  target    (string)           target name, default: `target`
+  input     (boolean|string)   ask for `{input}` first; a string is used as
+                               the input title. Empty input cancels.
+  submit    (boolean)          press <CR> after pasting, default: `submit`
+  keys      (string|string[])  keymap(s)
+  mode      (string|string[])  modes for `keys`, default: `{ "n", "x" }`
+  desc      (string)           keymap description
+
+------------------------------------------------------------------------------
+TARGETS                                                 *sling-config-targets*
+
+`targets` maps a name to a target table or a function.
+
+`type = "tmux"`                                            *sling-target-tmux*
+    Paste into a tmux pane in the current window, opening one when needed.
+
+    cmd            (string)    command started in a new pane
+    split          (string[])  args for `tmux split-window`,
+                               e.g. `{ "-h", "-l", "40%" }`
+    reuse          (boolean)   reuse an existing pane instead of splitting
+    match          (function)  `fun(pane): boolean`, recognises panes started
+                               by hand; `pane` is `{ id, command, title }`
+    ready          (string)    Lua pattern in the pane content that tells a
+                               new pane is ready for input
+    ready_timeout  (integer)   ms to wait for `ready`
+    focus          (boolean)   move to the pane after sending
+
+`type = "clipboard"`                                  *sling-target-clipboard*
+    Copy the prompt to the `+` register.
+
+Function                                               *sling-target-function*
+    `fun(prompt: string, ctx: table, action: table)`, e.g. >lua
+    targets = {
+      log = function(prompt) print(prompt) end,
+    }
+<
+------------------------------------------------------------------------------
+TEMPLATE VARIABLES                                           *sling-variables*
+
+  `{input}`        text typed at the prompt (actions with `input`)
+  `{file}`         file path relative to the cwd
+  `{abs_file}`     absolute file path
+  `{dir}`          directory of the file, relative to the cwd
+  `{cwd}`          current working directory
+  `{filetype}`     'filetype' of the buffer
+  `{lines}`        `10` or `10-20`
+  `{start_line}`   first line of the range
+  `{end_line}`     last line of the range
+  `{selection}`    selected text (whole lines for a command range)
+  `{diagnostics}`  diagnostics in the range, one per line
+
+==============================================================================
+7. LUA API                                                         *sling-api*
+
+                                                                 *sling.run()*
+sling.run({action}, {overrides}, {range})
+    Run an action by name, or an ad-hoc action table. {overrides} is merged
+    into the action. {range} is `{ first, last }` line numbers. >lua
+    require("sling").run("ask")
+    require("sling").run("ask", { submit = true })
+    require("sling").run({ template = "Review", target = "clipboard" })
+<
+==============================================================================
+8. HEALTH                                                       *sling-health*
+
+`:checkhealth sling` checks the Neovim version, tmux, the commands of tmux
+targets and that every action points to an existing target.
+
+ vim:tw=78:ts=8:ft=help:norl:

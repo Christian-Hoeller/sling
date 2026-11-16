@@ -53,17 +53,29 @@ function M.run(action, overrides, range)
   end)
 end
 
+-- keymaps of the previous setup(), removed when setup() runs again
+local mapped = {}
+
+---Optional: defaults are applied on startup. Call again to reconfigure.
 ---@param opts? sling.Config
 function M.setup(opts)
   config.setup(opts)
+  M.did_setup = true
+
+  for _, map in ipairs(mapped) do
+    pcall(vim.keymap.del, map[1], map[2])
+  end
+  mapped = {}
 
   for name, action in pairs(config.options.actions) do
     if action and action.keys then
       local keys = type(action.keys) == "table" and action.keys or { action.keys }
+      local mode = action.mode or { "n", "x" }
       for _, lhs in ipairs(keys) do
-        vim.keymap.set(action.mode or { "n", "x" }, lhs, function()
+        vim.keymap.set(mode, lhs, function()
           M.run(name)
         end, { desc = action.desc or ("Sling: " .. name) })
+        mapped[#mapped + 1] = { mode, lhs }
       end
     end
   end
