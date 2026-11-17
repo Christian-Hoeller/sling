@@ -14,7 +14,6 @@ Select code, hit a key, type a prompt. The prompt plus a file/line reference is 
 - Neovim **0.10+**
 - [tmux](https://github.com/tmux/tmux) — Neovim must run **inside** a tmux session
 - [Claude Code](https://docs.claude.com/en/docs/claude-code) (`claude` on `$PATH`), or any other CLI agent configured as a target
-- optional: a `vim.ui.input` provider (e.g. [snacks.nvim](https://github.com/folke/snacks.nvim), [dressing.nvim](https://github.com/stevearc/dressing.nvim)) for a nicer prompt box
 
 Check:
 
@@ -149,6 +148,10 @@ opts = {
   template = "{input}\n\n@{file}#L{lines}", -- default for all actions
   target = "claude",                        -- default target
   submit = false,                           -- default: prefill only
+
+  -- prompt window: multi-line, wraps at `width`, grows up to `max_height`
+  -- <C-s> submits (any mode), <CR> submits in normal mode, <Esc>/q cancels
+  input = { width = 80, min_height = 3, max_height = 15 },
 
   targets = {
     claude = {

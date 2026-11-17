@@ -44,7 +44,8 @@ function M.run(action, overrides, range)
   end
 
   local title = type(action.input) == "string" and action.input or "Prompt"
-  vim.ui.input({ prompt = title .. ": " }, function(input)
+  local win = vim.tbl_extend("force", config.options.input, { title = title })
+  require("sling.input").open(win, function(input)
     if input == nil or vim.trim(input) == "" then
       return
     end

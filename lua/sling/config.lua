@@ -16,6 +16,13 @@ M.defaults = {
   target = "claude",
   submit = false,
 
+  -- prompt window for actions with `input`
+  input = {
+    width = 80, -- text wraps at this width
+    min_height = 3,
+    max_height = 15, -- grows with the text up to this
+  },
+
   ---@type table<string, table|fun(prompt: string, ctx: table, action: sling.Action)>
   targets = {
     claude = {

@@ -76,6 +76,10 @@ Defaults: >lua
       template = "{input}\n\n@{file}#L{lines}",
       target = "claude",
       submit = false,
+      -- prompt window: multi-line, wraps at `width`, grows up to
+      -- `max_height`. <C-s> submits (any mode), <CR> submits in normal
+      -- mode, <Esc>/q cancels
+      input = { width = 80, min_height = 3, max_height = 15 },
       targets = {
         claude = {
           type = "tmux",
