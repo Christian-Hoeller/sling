@@ -5,11 +5,25 @@
   </picture>
 </h1>
 
-Sling a selection from Neovim to a CLI agent (Claude Code by default) running in a tmux pane.
+> Human tell AI make code. AI make code. Code bad. Sling grab bad line, sling throw at AI. AI make code. Code bad. Sling grab…
+>
+> Still bad code. Less copy paste.
 
-Select code, hit a key, type a prompt. The prompt plus a file/line reference is pasted into the agent's input. If no agent pane exists in the current tmux window, one is opened in a split.
+Select code, hit a key, type a prompt. The prompt plus a file/line reference lands in your CLI agent (Claude Code by default) running in a tmux pane. No agent pane in the current tmux window? sling opens one in a split.
 
-![sling demo](assets/demo.gif)
+## Demo
+
+### Existing agent session
+
+Agent already running in the window: prompt + reference are pasted straight into it.
+
+![sling with an existing agent session](assets/demo-existing-session.gif)
+
+### New agent session
+
+No agent pane yet: sling opens one in a split, then pastes the prompt.
+
+![sling opening a new agent session](assets/demo-new-session.gif)
 
 ## Requirements
 
