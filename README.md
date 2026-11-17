@@ -9,6 +9,8 @@ Sling a selection from Neovim to a CLI agent (Claude Code by default) running in
 
 Select code, hit a key, type a prompt. The prompt plus a file/line reference is pasted into the agent's input. If no agent pane exists in the current tmux window, one is opened in a split.
 
+![sling demo](assets/demo.gif)
+
 ## Requirements
 
 - Neovim **0.10+**
