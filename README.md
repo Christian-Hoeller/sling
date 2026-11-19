@@ -139,9 +139,13 @@ Run `:checkhealth sling` first.
 | `<leader>ap` | `ask`        | ask for a prompt, prefill it (no submit)     |
 | `<leader>aP` | `ask_submit` | ask for a prompt, submit it                  |
 | `<leader>aa` | `add`        | paste only the `@file#L1-5` reference        |
+| `<leader>ac` | `collect`    | add the reference to the scratch, open it    |
+| `<leader>as` | `scratch`    | open the scratch                             |
 | `<leader>ad` | `fix`        | send the diagnostics of the range with "fix" |
 
-All work in normal mode (cursor line) and visual mode (selection).
+All work in normal mode (cursor line) and visual mode (selection). In a file tree (neo-tree, snacks explorer, nvim-tree, oil) the entry under the cursor is used: `@lua/sling/` for a folder, `@lua/sling/init.lua` for a file. Select several with `V`, each becomes its own line.
+
+The **scratch** collects references and notes for one prompt. It is saved per working directory, so it survives restarts. `<Esc>` closes and keeps it, `<C-l>` empties it (`u` undoes), `<C-s>` sends it like `ask` and clears it once it arrived; a failed send keeps it.
 
 ### Command
 
@@ -161,13 +165,14 @@ Three pieces: **templates** build the prompt, **targets** receive it, **actions*
 
 ```lua
 opts = {
-  template = "{input}\n\n@{file}#L{lines}", -- default for all actions
+  template = "{input}\n\n{ref}",        -- default for all actions
   target = "claude",                        -- default target
   submit = false,                           -- default: prefill only
 
   -- prompt window: multi-line, wraps at `width`, grows up to `max_height`
   -- <C-s> submits (any mode), <CR> submits in normal mode, <Esc>/q cancels
   input = { width = 80, min_height = 3, max_height = 15 },
+  scratch = { width = 100, min_height = 15, max_height = 30 }, -- scratch window, same fields
 
   targets = {
     claude = {
@@ -183,7 +188,7 @@ opts = {
       focus = true,              -- jump to the pane after sending
     },
     clipboard = { type = "clipboard" },
-    -- a target can also be a function
+    -- a target can also be a function, returning false marks a failed send
     log = function(prompt, ctx, action) print(prompt) end,
   },
 
@@ -203,6 +208,11 @@ opts = {
   vars = {
     branch = function() return vim.trim(vim.fn.system("git branch --show-current")) end,
   },
+
+  -- file trees: filetype -> fun(line): path of the entry on that line (neo-tree, snacks explorer, nvim-tree, oil built in)
+  trees = {
+    minifiles = function(line) return (MiniFiles.get_fs_entry(0, line) or {}).path end,
+  },
 }
 ```
 
@@ -213,6 +223,7 @@ opts = {
 | `template` | `string`             | top-level `template` | prompt template                                                           |
 | `target`   | `string`             | top-level `target`   | name of a target in `targets`                                             |
 | `input`    | `boolean \| string`  | `nil`                | ask for `{input}` first; a string is the input title; empty input cancels |
+| `scratch`  | `boolean \| string`  | `nil`                | open the scratch instead; `template` is appended first; a string is the title |
 | `submit`   | `boolean`            | top-level `submit`   | press Enter after pasting                                                 |
 | `keys`     | `string \| string[]` | `nil`                | keymap(s)                                                                 |
 | `mode`     | `string \| string[]` | `{ "n", "x" }`       | modes for `keys`                                                          |
@@ -223,6 +234,7 @@ opts = {
 | Variable        | Value                                  |
 | --------------- | -------------------------------------- |
 | `{input}`       | text typed at the prompt               |
+| `{ref}`         | `@file#L1-5`, or `@path` in a file tree |
 | `{file}`        | file path relative to cwd              |
 | `{abs_file}`    | absolute file path                     |
 | `{dir}`         | directory of the file, relative to cwd |

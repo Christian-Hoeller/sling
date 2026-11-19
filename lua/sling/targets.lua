@@ -51,8 +51,8 @@ local function find_pane(name, opts)
   end
 end
 
----Poll the pane content until `opts.ready` shows up.
-local function when_ready(pane, opts, cb)
+---Poll the pane content until `opts.ready` shows up, `done(false)` when it doesn't.
+local function when_ready(pane, opts, cb, done)
   if not opts.ready then
     return cb()
   end
@@ -60,23 +60,26 @@ local function when_ready(pane, opts, cb)
   local function poll()
     local content = tmux({ "capture-pane", "-p", "-t", pane })
     if content == nil then
-      return notify("pane closed before it was ready")
+      notify("pane closed before it was ready")
+      return done(false)
     end
     if content:find(opts.ready) then
       -- give the app a moment to finish drawing its input
       return vim.defer_fn(cb, 300)
     end
     if vim.uv.now() > deadline then
-      return notify("timed out waiting for `" .. opts.cmd .. "`")
+      notify("timed out waiting for `" .. opts.cmd .. "`")
+      return done(false)
     end
     vim.defer_fn(poll, 100)
   end
   poll()
 end
 
-local function paste(pane, prompt, opts, submit)
+local function paste(pane, prompt, opts, submit, done)
   if tmux({ "load-buffer", "-b", BUFFER, "-" }, prompt) == nil then
-    return notify("tmux load-buffer failed")
+    notify("tmux load-buffer failed")
+    return done(false)
   end
   -- -p: bracketed paste, so newlines don't submit
   tmux({ "paste-buffer", "-p", "-d", "-b", BUFFER, "-t", pane })
@@ -92,17 +95,21 @@ local function paste(pane, prompt, opts, submit)
       tmux({ "send-keys", "-t", pane, "Enter" })
     end, 150)
   end
+  done(true)
 end
 
 ---Paste the prompt into a tmux pane running `opts.cmd`, creating the pane when needed.
-function M.tmux(prompt, ctx, action, opts, name)
+---`done(ok)` runs once the prompt is pasted or sending failed, possibly much later.
+---@param done fun(ok: boolean)
+function M.tmux(prompt, ctx, action, opts, name, done)
   if not vim.env.TMUX then
-    return notify("not inside tmux")
+    notify("not inside tmux")
+    return done(false)
   end
 
   local pane = opts.reuse and find_pane(name, opts)
   if pane then
-    return paste(pane, prompt, opts, action.submit)
+    return paste(pane, prompt, opts, action.submit, done)
   end
 
   local args = { "split-window", "-d", "-P", "-F", "#{pane_id}", "-t", vim.env.TMUX_PANE, "-c", vim.fn.getcwd() }
@@ -110,20 +117,22 @@ function M.tmux(prompt, ctx, action, opts, name)
   args[#args + 1] = opts.cmd
   pane = tmux(args)
   if not pane or pane == "" then
-    return notify("could not open tmux pane")
+    notify("could not open tmux pane")
+    return done(false)
   end
   panes[name] = pane
   if opts.focus then
     tmux({ "select-pane", "-t", pane })
   end
   when_ready(pane, opts, function()
-    paste(pane, prompt, opts, action.submit)
-  end)
+    paste(pane, prompt, opts, action.submit, done)
+  end, done)
 end
 
-function M.clipboard(prompt)
+function M.clipboard(prompt, ctx, action, opts, name, done)
   vim.fn.setreg("+", prompt)
   notify("prompt copied", vim.log.levels.INFO)
+  done(true)
 end
 
 return M

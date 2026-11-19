@@ -61,7 +61,16 @@ All default keymaps work in normal mode (cursor line) and visual mode
   `<leader>ap`    `ask`           prompt for input, prefill it (no submit)
   `<leader>aP`    `ask_submit`    prompt for input, submit it
   `<leader>aa`    `add`           paste only the `@file#L1-5` reference
+  `<leader>ac`    `collect`       add the reference to the scratch, open it
+  `<leader>as`    `scratch`       open the scratch
   `<leader>ad`    `fix`           send the diagnostics of the range
+
+                                                               *sling-scratch*
+The scratch collects references and notes for one prompt. New entries are
+appended below, separated by an empty line. It is saved per working
+directory under `stdpath("state")/sling/scratch`. <Esc> closes and keeps
+it, <C-l> empties it (`u` undoes), <C-s> sends it like `ask` and clears it
+once it arrived; a failed send keeps it.
 
 ==============================================================================
 6. CONFIGURATION                                                *sling-config*
@@ -73,13 +82,15 @@ sling.setup({opts})
 Defaults: >lua
     require("sling").setup({
       -- used by actions that don't set their own
-      template = "{input}\n\n@{file}#L{lines}",
+      template = "{input}\n\n{ref}",
       target = "claude",
       submit = false,
       -- prompt window: multi-line, wraps at `width`, grows up to
       -- `max_height`. <C-s> submits (any mode), <CR> submits in normal
       -- mode, <Esc>/q cancels
       input = { width = 80, min_height = 3, max_height = 15 },
+      -- scratch window, same fields as `input`
+      scratch = { width = 100, min_height = 15, max_height = 30 },
       targets = {
         claude = {
           type = "tmux",
@@ -98,6 +109,7 @@ Defaults: >lua
       },
       actions = { --[[ see |sling-actions| ]] },
       vars = {},
+      trees = {},
     })
 <
                                                               *sling-template*
@@ -116,6 +128,19 @@ vars ~
     vars = {
       branch = function()
         return vim.trim(vim.fn.system("git branch --show-current"))
+      end,
+    }
+<
+
+trees ~                                                          *sling-trees*
+    In a file tree the entry under the cursor is used instead of lines,
+    `{ref}` becomes `@path` (folders end in `/`). Built in: neo-tree, snacks
+    explorer, nvim-tree, oil. In visual mode every entry in the selection is
+    used, one `@path` per line. Add more as `filetype -> fun(line): string?`,
+    the path of the entry on that line: >lua
+    trees = {
+      minifiles = function(line)
+        return (MiniFiles.get_fs_entry(0, line) or {}).path
       end,
     }
 <
@@ -141,6 +166,8 @@ Action fields:
   target    (string)           target name, default: `target`
   input     (boolean|string)   ask for `{input}` first; a string is used as
                                the input title. Empty input cancels.
+  scratch   (boolean|string)   open the |sling-scratch| instead; `template`
+                               is appended first. A string is the title.
   submit    (boolean)          press <CR> after pasting, default: `submit`
   keys      (string|string[])  keymap(s)
   mode      (string|string[])  modes for `keys`, default: `{ "n", "x" }`
@@ -169,7 +196,8 @@ TARGETS                                                 *sling-config-targets*
     Copy the prompt to the `+` register.
 
 Function                                               *sling-target-function*
-    `fun(prompt: string, ctx: table, action: table)`, e.g. >lua
+    `fun(prompt: string, ctx: table, action: table)`. Return `false` to mark
+    the send as failed, e.g. so |sling-scratch| is kept. >lua
     targets = {
       log = function(prompt) print(prompt) end,
     }
@@ -178,6 +206,7 @@ Function                                               *sling-target-function*
 TEMPLATE VARIABLES                                           *sling-variables*
 
   `{input}`        text typed at the prompt (actions with `input`)
+  `{ref}`          `@file#L1-5`, or `@path` in a |sling-trees| entry
   `{file}`         file path relative to the cwd
   `{abs_file}`     absolute file path
   `{dir}`          directory of the file, relative to the cwd

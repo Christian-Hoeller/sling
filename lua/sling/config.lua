@@ -4,6 +4,7 @@ local M = {}
 ---@field template? string prompt template, `{var}` placeholders
 ---@field target? string name of a target in `targets`
 ---@field input? boolean|string ask for input; a string is used as the input title
+---@field scratch? boolean|string open the scratch instead; `template` is appended to it first; a string is the title
 ---@field submit? boolean send the prompt right away instead of only prefilling
 ---@field keys? string|string[] keymap(s) for this action
 ---@field mode? string|string[] modes for `keys`
@@ -12,7 +13,7 @@ local M = {}
 ---@class sling.Config
 M.defaults = {
   -- used by actions that don't set their own
-  template = "{input}\n\n@{file}#L{lines}",
+  template = "{input}\n\n{ref}",
   target = "claude",
   submit = false,
 
@@ -21,6 +22,13 @@ M.defaults = {
     width = 80, -- text wraps at this width
     min_height = 3,
     max_height = 15, -- grows with the text up to this
+  },
+
+  -- scratch window, same fields as `input`
+  scratch = {
+    width = 100,
+    min_height = 15,
+    max_height = 30,
   },
 
   ---@type table<string, table|fun(prompt: string, ctx: table, action: sling.Action)>
@@ -55,9 +63,17 @@ M.defaults = {
       mode = { "n", "x" },
       desc = "Prompt (submit)",
     },
-    add = { template = "@{file}#L{lines} ", keys = "<leader>aa", mode = { "n", "x" }, desc = "Add reference" },
+    add = { template = "{ref} ", keys = "<leader>aa", mode = { "n", "x" }, desc = "Add reference" },
+    collect = {
+      scratch = true,
+      template = "{ref} ",
+      keys = "<leader>ac",
+      mode = { "n", "x" },
+      desc = "Add reference to scratch",
+    },
+    scratch = { scratch = true, keys = "<leader>as", mode = { "n", "x" }, desc = "Open scratch" },
     fix = {
-      template = "Fix these diagnostics in @{file}#L{lines}:\n{diagnostics}",
+      template = "Fix these diagnostics in {ref}:\n{diagnostics}",
       keys = "<leader>ad",
       mode = { "n", "x" },
       desc = "Fix diagnostics",
@@ -67,6 +83,10 @@ M.defaults = {
   -- extra template variables: name -> fun(ctx): string
   ---@type table<string, fun(ctx: table): string>
   vars = {},
+
+  -- file trees: filetype -> fun(): string?, path under the cursor
+  ---@type table<string, fun(line: integer): string?>
+  trees = {},
 }
 
 ---@type sling.Config
