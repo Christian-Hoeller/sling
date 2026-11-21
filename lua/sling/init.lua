@@ -5,6 +5,29 @@ local targets = require("sling.targets")
 
 local M = {}
 
+-- index into each target's `models`, picked in the prompt window and kept for the session
+local picked = {}
+
+---`models` of a target and the index of the picked one, nil when it has none.
+---@return (string|{ name?: string, id: string })[]?, integer
+local function models(name)
+  local target = config.options.targets[name]
+  local list = type(target) == "table" and target.models or nil
+  if not list or #list == 0 then
+    return nil, 1
+  end
+  -- the list may have shrunk since the last setup()
+  return list, list[picked[name]] and picked[name] or 1
+end
+
+local function model_id(model)
+  return type(model) == "table" and model.id or model
+end
+
+local function model_name(model)
+  return type(model) == "table" and (model.name or model.id) or model
+end
+
 ---@param done? fun(ok: boolean) runs once the target received the prompt or failed
 local function send(action, ctx, done)
   done = done or function() end
@@ -14,6 +37,10 @@ local function send(action, ctx, done)
   if not target then
     vim.notify("sling: unknown target `" .. tostring(name) .. "`", vim.log.levels.ERROR)
     return done(false)
+  end
+  local list, i = models(name)
+  if list and not action.model then
+    action = vim.tbl_extend("force", action, { model = model_id(list[i]) })
   end
 
   local prompt = context.render(action.template or opts.template, ctx, opts.vars)
@@ -30,11 +57,33 @@ local function send(action, ctx, done)
 end
 
 ---Prompt window, sized by `size` (default: the `input` option).
----@param opts { title: string, lines?: string[], footer?: string, keys?: table<string, fun(buf: integer)> }
+---Shows the model picked for the action's target in the title, `model_key` cycles it.
+---@param opts { title: string, lines?: string[], footer?: string, keys?: table<string, fun(buf: integer, win: integer)> }
 ---@param on_done fun(text: string, submitted: boolean)
 ---@param size? { width: integer, min_height: integer, max_height: integer }
-local function prompt(opts, on_done, size)
-  require("sling.input").open(vim.tbl_extend("force", size or config.options.input, opts), on_done)
+local function prompt(action, opts, on_done, size)
+  local input = require("sling.input")
+  local name = action.target or config.options.target
+  local list, i = models(name)
+  local key = config.options.model_key
+  if list and key and not action.model then
+    local base = opts.title
+    local function title()
+      return base .. " · " .. model_name(list[i])
+    end
+    opts = vim.tbl_extend("force", opts, {
+      title = title(),
+      footer = " " .. key .. " model ·" .. (opts.footer or input.footer),
+      keys = vim.tbl_extend("force", opts.keys or {}, {
+        [key] = function(_, win)
+          i = i % #list + 1
+          picked[name] = i
+          vim.api.nvim_win_set_config(win, { title = " " .. title() .. " ", title_pos = "center" })
+        end,
+      }),
+    })
+  end
+  input.open(vim.tbl_extend("force", size or config.options.input, opts), on_done)
 end
 
 local function clear(buf)
@@ -55,7 +104,7 @@ local function open_scratch(action, ctx)
     footer = " <C-s> submit · <C-l> clear · <Esc> close ",
     keys = { ["<C-l>"] = clear },
   }
-  prompt(win, function(text, submitted)
+  prompt(action, win, function(text, submitted)
     local sent = vim.split(text, "\n")
     -- save first, a failed send keeps the scratch
     scratch.write(sent)
@@ -96,7 +145,7 @@ function M.run(action, overrides, range)
   end
 
   local title = type(action.input) == "string" and action.input or "Prompt"
-  prompt({ title = title }, function(input, submitted)
+  prompt(action, { title = title }, function(input, submitted)
     if not submitted or vim.trim(input) == "" then
       return
     end

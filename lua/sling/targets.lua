@@ -5,6 +5,9 @@ local BUFFER = "sling"
 -- pane ids created by the plugin, keyed by target name
 local panes = {}
 
+-- model id each pane runs, keyed by pane id; unknown for panes started by hand
+local pane_models = {}
+
 local function notify(msg, level)
   vim.notify(msg, level or vim.log.levels.ERROR, { title = "sling" })
 end
@@ -98,7 +101,25 @@ local function paste(pane, prompt, opts, submit, done)
   done(true)
 end
 
+---Type `opts.model_switch` into a running pane first when it isn't known to run `model`.
+local function switch_model(pane, model, opts, cb)
+  if not model or not opts.model_switch or pane_models[pane] == model then
+    return cb()
+  end
+  pane_models[pane] = model
+  local cmd = opts.model_switch:gsub("{model}", function()
+    return model
+  end)
+  tmux({ "send-keys", "-t", pane, "-l", cmd })
+  vim.defer_fn(function()
+    tmux({ "send-keys", "-t", pane, "Enter" })
+    -- let the app switch before the prompt arrives
+    vim.defer_fn(cb, 500)
+  end, 150)
+end
+
 ---Paste the prompt into a tmux pane running `opts.cmd`, creating the pane when needed.
+---`action.model` starts a new pane with `opts.model_flag`, or switches a running one.
 ---`done(ok)` runs once the prompt is pasted or sending failed, possibly much later.
 ---@param done fun(ok: boolean)
 function M.tmux(prompt, ctx, action, opts, name, done)
@@ -109,18 +130,25 @@ function M.tmux(prompt, ctx, action, opts, name, done)
 
   local pane = opts.reuse and find_pane(name, opts)
   if pane then
-    return paste(pane, prompt, opts, action.submit, done)
+    return switch_model(pane, action.model, opts, function()
+      paste(pane, prompt, opts, action.submit, done)
+    end)
   end
 
   local args = { "split-window", "-d", "-P", "-F", "#{pane_id}", "-t", vim.env.TMUX_PANE, "-c", vim.fn.getcwd() }
   vim.list_extend(args, opts.split or { "-h" })
-  args[#args + 1] = opts.cmd
+  local cmd = opts.cmd
+  if action.model and opts.model_flag then
+    cmd = cmd .. " " .. opts.model_flag .. " " .. vim.fn.shellescape(action.model)
+  end
+  args[#args + 1] = cmd
   pane = tmux(args)
   if not pane or pane == "" then
     notify("could not open tmux pane")
     return done(false)
   end
   panes[name] = pane
+  pane_models[pane] = action.model
   if opts.focus then
     tmux({ "select-pane", "-t", pane })
   end

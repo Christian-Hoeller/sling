@@ -11,6 +11,8 @@
 
 Select code, hit a key, type a prompt. The prompt plus a file/line reference lands in your CLI agent (Claude Code by default) running in a tmux pane. No agent pane in the current tmux window? sling opens one in a split.
 
+Bigger task? Build up the context first: collect references from several files, folders (file trees work too) and notes in a scratch, then send it all as one prompt. The scratch is saved per project and survives restarts.
+
 ## Demo
 
 ### Existing agent session
@@ -147,6 +149,8 @@ All work in normal mode (cursor line) and visual mode (selection). In a file tre
 
 The **scratch** collects references and notes for one prompt. It is saved per working directory, so it survives restarts. `<Esc>` closes and keeps it, `<C-l>` empties it (`u` undoes), `<C-s>` sends it like `ask` and clears it once it arrived; a failed send keeps it.
 
+The **model** shows in the title of the prompt and scratch window; `<C-t>` cycles through Opus 5.5, Fable 5.2 and Sonnet 5.5. The pick sticks for the session and applies to all actions. A new pane starts with `claude --model <id>`; a running pane on another model gets `/model <id>` typed first.
+
 ### Command
 
 ```vim
@@ -173,6 +177,7 @@ opts = {
   -- <C-s> submits (any mode), <CR> submits in normal mode, <Esc>/q cancels
   input = { width = 80, min_height = 3, max_height = 15 },
   scratch = { width = 100, min_height = 15, max_height = 30 }, -- scratch window, same fields
+  model_key = "<C-t>",                      -- cycle the target's `models` in prompt/scratch window
 
   targets = {
     claude = {
@@ -186,6 +191,13 @@ opts = {
       ready = "Claude Code v",   -- lua pattern in the pane content: fresh pane is ready
       ready_timeout = 15000,     -- ms
       focus = true,              -- jump to the pane after sending
+      models = {                 -- picked with `model_key`, first is the default; `{ name, id }` or id strings
+        { name = "Opus 5.5", id = "claude-opus-5-5" },
+        { name = "Fable 5.2", id = "claude-fable-5-2" },
+        { name = "Sonnet 5.5", id = "claude-sonnet-5-5" },
+      },
+      model_flag = "--model",    -- new pane: `claude --model <id>`
+      model_switch = "/model {model}", -- typed into a running pane on another model
     },
     clipboard = { type = "clipboard" },
     -- a target can also be a function, returning false marks a failed send
@@ -228,6 +240,7 @@ opts = {
 | `keys`     | `string \| string[]` | `nil`                | keymap(s)                                                                 |
 | `mode`     | `string \| string[]` | `{ "n", "x" }`       | modes for `keys`                                                          |
 | `desc`     | `string`             | `Sling: <name>`      | keymap description                                                        |
+| `model`    | `string`             | picked model         | model id, skips the picker                                                |
 
 ### Template variables
 

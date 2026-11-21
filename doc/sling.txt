@@ -72,6 +72,14 @@ directory under `stdpath("state")/sling/scratch`. <Esc> closes and keeps
 it, <C-l> empties it (`u` undoes), <C-s> sends it like `ask` and clears it
 once it arrived; a failed send keeps it.
 
+                                                                *sling-model*
+The model picked for the target shows in the title of the prompt and
+scratch window, `model_key` (<C-t>) cycles through the target's `models`.
+The pick is kept for the session and used by all actions of that target.
+A new pane starts with `cmd model_flag <id>`; a running pane not known to
+run the model gets `model_switch` typed first. That happens on the first
+send to a pane started by hand, so its input should be empty then.
+
 ==============================================================================
 6. CONFIGURATION                                                *sling-config*
                                                                *sling.setup()*
@@ -91,6 +99,8 @@ Defaults: >lua
       input = { width = 80, min_height = 3, max_height = 15 },
       -- scratch window, same fields as `input`
       scratch = { width = 100, min_height = 15, max_height = 30 },
+      -- cycles the target's `models` in the prompt and scratch window
+      model_key = "<C-t>",
       targets = {
         claude = {
           type = "tmux",
@@ -104,6 +114,13 @@ Defaults: >lua
           ready = "Claude Code v",
           ready_timeout = 15000,
           focus = true,
+          models = {
+            { name = "Opus 5.5", id = "claude-opus-5-5" },
+            { name = "Fable 5.2", id = "claude-fable-5-2" },
+            { name = "Sonnet 5.5", id = "claude-sonnet-5-5" },
+          },
+          model_flag = "--model",
+          model_switch = "/model {model}",
         },
         clipboard = { type = "clipboard" },
       },
@@ -172,6 +189,7 @@ Action fields:
   keys      (string|string[])  keymap(s)
   mode      (string|string[])  modes for `keys`, default: `{ "n", "x" }`
   desc      (string)           keymap description
+  model     (string)           model id, skips the |sling-model| picker
 
 ------------------------------------------------------------------------------
 TARGETS                                                 *sling-config-targets*
@@ -191,6 +209,11 @@ TARGETS                                                 *sling-config-targets*
                                new pane is ready for input
     ready_timeout  (integer)   ms to wait for `ready`
     focus          (boolean)   move to the pane after sending
+    models         (table)     |sling-model| list, first is the default;
+                               `{ name, id }` tables or id strings. Replaces
+                               the default list instead of merging
+    model_flag     (string)    appended to `cmd` with the id in a new pane
+    model_switch   (string)    typed into a running pane, `{model}` is the id
 
 `type = "clipboard"`                                  *sling-target-clipboard*
     Copy the prompt to the `+` register.

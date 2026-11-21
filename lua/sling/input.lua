@@ -1,10 +1,12 @@
 local M = {}
 
+M.footer = " <C-s> submit · <Esc> cancel "
+
 ---Multi-line prompt in a floating window. Text wraps at a fixed width.
 ---`<C-s>` (any mode) or `<CR>` (normal mode) submits, `<Esc>`/`q` (normal mode) closes.
 ---`lines` prefills the window, the cursor starts at the end of the text.
----`keys` adds mappings (normal and insert mode) that get the buffer.
----@param opts { title: string, width: integer, min_height: integer, max_height: integer, lines?: string[], footer?: string, keys?: table<string, fun(buf: integer)> }
+---`keys` adds mappings (normal and insert mode) that get the buffer and window.
+---@param opts { title: string, width: integer, min_height: integer, max_height: integer, lines?: string[], footer?: string, keys?: table<string, fun(buf: integer, win: integer)> }
 ---@param on_done fun(text: string, submitted: boolean)
 function M.open(opts, on_done)
   local buf = vim.api.nvim_create_buf(false, true)
@@ -29,7 +31,7 @@ function M.open(opts, on_done)
     border = "rounded",
     title = " " .. opts.title .. " ",
     title_pos = "center",
-    footer = opts.footer or " <C-s> submit · <Esc> cancel ",
+    footer = opts.footer or M.footer,
     footer_pos = "right",
   })
   vim.wo[win].wrap = true
@@ -71,7 +73,7 @@ function M.open(opts, on_done)
   map("n", "q", close)
   for lhs, fn in pairs(opts.keys or {}) do
     map({ "n", "i" }, lhs, function()
-      fn(buf)
+      fn(buf, win)
     end)
   end
 

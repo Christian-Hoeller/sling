@@ -9,6 +9,7 @@ local M = {}
 ---@field keys? string|string[] keymap(s) for this action
 ---@field mode? string|string[] modes for `keys`
 ---@field desc? string
+---@field model? string model id, default: the one picked in the prompt window
 
 ---@class sling.Config
 M.defaults = {
@@ -31,6 +32,9 @@ M.defaults = {
     max_height = 30,
   },
 
+  -- key in the prompt and scratch window that cycles the target's `models`
+  model_key = "<C-t>",
+
   ---@type table<string, table|fun(prompt: string, ctx: table, action: sling.Action)>
   targets = {
     claude = {
@@ -49,6 +53,17 @@ M.defaults = {
       ready_timeout = 15000,
       -- move the cursor to the pane after sending
       focus = true,
+      -- picked with `model_key` in the prompt window, the first is the default.
+      -- `{ name, id }` tables or plain id strings
+      models = {
+        { name = "Opus 5.5", id = "claude-opus-5-5" },
+        { name = "Fable 5.2", id = "claude-fable-5-2" },
+        { name = "Sonnet 5.5", id = "claude-sonnet-5-5" },
+      },
+      -- appended to `cmd` with the model id when a new pane starts
+      model_flag = "--model",
+      -- typed into a running pane that runs another model, `{model}` is the id
+      model_switch = "/model {model}",
     },
     clipboard = { type = "clipboard" },
   },
@@ -93,7 +108,14 @@ M.defaults = {
 M.options = vim.deepcopy(M.defaults)
 
 function M.setup(opts)
-  M.options = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts or {})
+  opts = opts or {}
+  M.options = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts)
+  -- a list replaces the default one instead of merging by index
+  for name, target in pairs(opts.targets or {}) do
+    if type(target) == "table" and target.models then
+      M.options.targets[name].models = vim.deepcopy(target.models)
+    end
+  end
 end
 
 return M
