@@ -27,6 +27,18 @@ No agent pane yet: sling opens one in a split, then pastes the prompt.
 
 ![sling opening a new agent session](assets/demo-new-session.gif)
 
+### Model picker
+
+The prompt window shows the model, `<C-t>` cycles it. A new pane starts on the picked model.
+
+![sling picking a model](assets/demo-model.gif)
+
+### Scratch
+
+Collect references from several files and the file tree, add a note, send it all as one prompt.
+
+![sling collecting references in the scratch](assets/demo-scratch.gif)
+
 ## Requirements
 
 - Neovim **0.10+**
