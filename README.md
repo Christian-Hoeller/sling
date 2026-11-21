@@ -15,6 +15,8 @@ Bigger task? Build up the context first: collect references from several files, 
 
 ## Demo
 
+The demos use custom `<leader>k*` mappings; the defaults are `<leader>a*`, see [Default actions](#default-actions).
+
 ### Existing agent session
 
 Agent already running in the window: prompt + reference are pasted straight into it.
@@ -112,7 +114,7 @@ Reports the Neovim version, tmux, whether Neovim runs inside tmux, the target co
 ### 4. Sling
 
 1. Put the cursor on a line, or select lines in visual mode.
-2. Press `<leader>ap`, type a prompt, e.g. `why is this slow?`, hit `<Enter>`.
+2. Press `<leader>ap`, type a prompt, e.g. `why is this slow?`, hit `<C-s>` (`<Enter>` adds a new line; in normal mode it sends too).
 3. A pane running `claude` opens to the right (or an existing one is reused). Once Claude Code is ready, this is pasted into its input:
 
    ```
@@ -141,6 +143,7 @@ Not in tmux? Use the built-in clipboard target:
 | `timed out waiting for claude` in a new folder | Claude Code asks "Do you trust this folder?" first; answer it in the pane, then sling again |
 | keymaps missing / different   | another plugin uses `<leader>a*` (e.g. LazyVim's AI group); remap the actions, see [Configuration](#configuration) |
 | keymaps on `\` instead of space | `mapleader` is set after sling loaded; set it before plugins load |
+| `/model …` ends up in the prompt and gets submitted | the agent's input wasn't empty when the model changed (e.g. after `add`); send or clear the input before picking another model |
 
 Run `:checkhealth sling` first.
 
@@ -161,7 +164,7 @@ All work in normal mode (cursor line) and visual mode (selection). In a file tre
 
 The **scratch** collects references and notes for one prompt. It is saved per working directory, so it survives restarts. `<Esc>` closes and keeps it, `<C-l>` empties it (`u` undoes), `<C-s>` sends it like `ask` and clears it once it arrived; a failed send keeps it.
 
-The **model** shows in the title of the prompt and scratch window; `<C-t>` cycles through Opus 5.5, Fable 5.2 and Sonnet 5.5. The pick sticks for the session and applies to all actions. A new pane starts with `claude --model <id>`; a running pane on another model gets `/model <id>` typed first.
+The **model** shows in the title of the prompt and scratch window; `<C-t>` cycles through the target's `models` (default: Opus 5.5, Fable 5.2, Sonnet 5.5, see [Configuration](#configuration)). The pick sticks for the session and applies to all actions sending to that target; targets without `models` (e.g. clipboard) have no picker. A new pane starts with `claude --model <id>`; a running pane on another model gets `/model <id>` typed first, so its input should be empty then.
 
 ### Command
 
@@ -278,6 +281,7 @@ Unknown placeholders are left as is.
 ```lua
 require("sling").run("ask")
 require("sling").run("ask", { submit = true })
+require("sling").run("ask", { model = "claude-sonnet-5-5" }) -- fixed model, no picker
 require("sling").run({ template = "Review @{file}", target = "clipboard" })
 ```
 

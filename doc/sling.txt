@@ -37,7 +37,8 @@ on startup. Call |sling.setup()| only to change the defaults.
 3. USAGE                                                         *sling-usage*
 
 1. Put the cursor on a line, or select lines in visual mode.
-2. Press `<leader>ap` and type a prompt.
+2. Press `<leader>ap`, type a prompt and send it with <C-s> (<CR> adds a
+   line in insert mode, sends in normal mode).
 3. The prompt is pasted into the agent pane, but not submitted. Press <CR>
    there to send it, or use `<leader>aP` to submit right away.
 
@@ -76,6 +77,7 @@ once it arrived; a failed send keeps it.
 The model picked for the target shows in the title of the prompt and
 scratch window, `model_key` (<C-t>) cycles through the target's `models`.
 The pick is kept for the session and used by all actions of that target.
+Targets without `models` (e.g. clipboard) have no picker.
 A new pane starts with `cmd model_flag <id>`; a running pane not known to
 run the model gets `model_switch` typed first. That happens on the first
 send to a pane started by hand, so its input should be empty then.
@@ -250,6 +252,7 @@ sling.run({action}, {overrides}, {range})
     into the action. {range} is `{ first, last }` line numbers. >lua
     require("sling").run("ask")
     require("sling").run("ask", { submit = true })
+    require("sling").run("ask", { model = "claude-sonnet-5-5" })
     require("sling").run({ template = "Review", target = "clipboard" })
 <
 ==============================================================================
